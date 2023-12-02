@@ -9,8 +9,8 @@ flowchart LR
     GPG-Agent --> pinentry-box
     pinentry-box --> pinentry-mac
     pinentry-box --> pinentry-bitwarden
-    pinentry-mac --> MacOS Keychain
-    pinentry-bitwarden --> Bitwarden Vault API/CLI
+    pinentry-mac --> keychain["MacOS Keychain"]
+    pinentry-bitwarden --> bitwarden["Bitwarden Vault API/CLI"]
 ```
 
 Notice that pinentry-box will filter which secret key can be retrieved from which vault.
