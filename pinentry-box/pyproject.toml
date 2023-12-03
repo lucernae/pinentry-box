@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "pinentry_box"
+version = "0.1.0"
+description = "A simple program to mesh pinentry"
+authors = ["Rizky Maulana Nugraha <lana.pcfre@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+assuan = "^0.2.1b1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+pinentry_box = "pinentry_box.cli:main"
