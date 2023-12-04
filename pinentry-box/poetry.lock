@@ -15,7 +15,17 @@ files = [
 dev = ["bandit (>=1.6.2)", "black (==22.1.0)", "build (>=0.7.0,<1)", "click (==8.0.4)", "flake8 (>=3.8.3,<4)", "flit (>=3,<4)", "isort (>=5.9.2,<6)", "mypy (>=0.942,<1)", "proman-versioning (>=0.5.0-alpha.2)", "pylint (>=2.9.5,<3)", "pytest (>=7)", "pytest-cov (>=2.10)", "safety (>=1.9)", "tox (>=3.24.0,<4)", "wheel (>=0.37.1,<1)"]
 docs = ["doc8 (>=0.11.2,<1)", "docstr-coverage (>=1.2.0,<2)", "pydocstyle[toml] (>=6.1.1,<7)", "sphinx (>=5.3)", "sphinx-autodoc-typehints (>=1.19.5)"]
 
+[[package]]
+name = "pydevd-pycharm"
+version = "231.9225.15"
+description = "PyCharm Debugger (used in PyCharm and PyDev)"
+optional = false
+python-versions = "*"
+files = [
+    {file = "pydevd-pycharm-231.9225.15.tar.gz", hash = "sha256:404698af8f478902cc251a49616685c505b659eab3b7b2b3623b92246e5f9141"},
+]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "a96c8cf8299f59b228a46647de8347b8d17b14152cbae9f7a48930bc5420634d"
+content-hash = "b727212c66db21e848f152453b2b81e551075ef43ecfe7f7708b40241ac21131"

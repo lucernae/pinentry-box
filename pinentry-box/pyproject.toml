@@ -9,7 +9,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11"
 assuan = "^0.2.1b1"
-
+pydevd-pycharm = ">=231.9225.15,<231.9226.0"
 
 [build-system]
 requires = ["poetry-core"]

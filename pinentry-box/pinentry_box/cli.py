@@ -32,16 +32,24 @@ def main():
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
     logging.basicConfig(filename='/tmp/pinentry-box.log', filemode='w', level=log_level)
-    logging.getLogger(__name__).setLevel(log_level)
+    logging.getLogger(__name__).setLevel(logging.CRITICAL)
     logging.getLogger('assuan').setLevel(log_level)
     logging.info('test logging')
     pinentry_mac_program = '/nix/store/ckc8kwsqjzgigwak9q1jkag4axv2c2mm-pinentry-mac-1.1.1.1/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac'
     pinentry_fallback = os.getenv('PINENTRY_BOX_FALLBACK', pinentry_mac_program)
     logging.info(f'Using pinentry fallback: {pinentry_fallback}')
+
+    pycharm_debug_mode = os.getenv('PYCHARM_DEBUG_MODE', '0')
+    logging.info(f'Using debug mode: {pycharm_debug_mode}')
+    if pycharm_debug_mode == '1':
+        import pydevd_pycharm
+        pydevd_pycharm.settrace('localhost', port=6113, stdoutToServer=True, stderrToServer=True)
+
     server = ProxyAssuanServer(name='pinentry-box', fallback_server_program=pinentry_fallback)
     # to test something via debugger flow, use this to avoid IO blocking:
     # server.intake = io.BytesIO(b'BYE\n')
     server.run()
+
 
 if __name__ == '__main__':
     main()
