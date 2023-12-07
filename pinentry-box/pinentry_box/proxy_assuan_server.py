@@ -1,11 +1,15 @@
 import logging
+import os
 import subprocess
+import sys
+import tempfile
+import time
 import traceback
 from typing import Optional, Generator
 
 import assuan
-from assuan.common import VarText
 from assuan import common, Request, Response, AssuanError
+from assuan.common import VarText
 
 log = logging.getLogger(__name__)
 
@@ -17,21 +21,319 @@ class ProxyAssuanServer(assuan.AssuanServer):
 
     def __init__(self, fallback_server_program=None, **kwargs):
         self.fallback_server_program = fallback_server_program
-        self.fallback_popen = subprocess.Popen(
-            [self.fallback_server_program],
-            stdout=subprocess.PIPE,
-            stdin=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        self.fallback_fifo_in = tempfile.mktemp()
+        self.fallback_fifo_out = tempfile.mktemp()
+        self.fallback_fifo_err = tempfile.mktemp()
+        os.mkfifo(self.fallback_fifo_in)
+        # os.mkfifo(self.fallback_fifo_out)
+        # os.mkfifo(self.fallback_fifo_err)
+
+        def _opener(path, flags):
+            return os.open(path, flags | os.O_NONBLOCK)
+
+        # perform read to unblock write fifo
+        # fifo_in = open(self.fallback_fifo_in, "rb", opener=_opener)
+        # fifo_in.read()
+
+        # self.fallback_stream_fifo_out: io.BytesIO = open(self.fallback_fifo_out, "rb", opener=_opener)
+        # self.fallback_stream_fifo_err: io.BytesIO = open(self.fallback_fifo_err, "rb", opener=_opener)
+        # self.fallback_stream_fifo_in: io.BytesIO = open(self.fallback_fifo_in, "w", opener=_opener)
+
+        # self.fallback_popen = subprocess.Popen(
+        #     [self.fallback_server_program],
+        #     stdout=self.fallback_stream_fifo_out,
+        #     stderr=self.fallback_stream_fifo_err,
+        #     stdin=self.fallback_stream_fifo_in,
+        # )
+        # self.fallback_popen = subprocess.Popen(
+        #     f'{self.fallback_server_program}<{self.fallback_fifo_in}>{self.fallback_fifo_out}',
+        #     # stdout=subprocess.PIPE,
+        #     # stderr=subprocess.PIPE,
+        #     shell=True,
+        # )
+        #
+        # # self.fallback_popen = subprocess.Popen(
+        # #     [self.fallback_server_program],
+        # #     stdout=subprocess.PIPE,
+        # #     stderr=subprocess.PIPE,
+        # #     stdin=subprocess.PIPE,
+        # # )
+        #
+        # while True:
+        #     try:
+        #         self.fallback_stream_fifo_in = open(self.fallback_fifo_in, "w", opener=_opener)
+        #         break
+        #     except OSError as e:
+        #         log.info(e)
+        #         time.sleep(5)
+
+        self._start_fallback_server()
+
         super().__init__(**kwargs)
         self._register_fallback_command(assuan.Request(command='HELP'), override=True)
         self._register_fallback_command(assuan.Request(command='OPTION'), override=True)
+
+    def connect(self) -> None:
+        """Connect to the GPG Agent."""
+        if not self.intake:
+            log.info('read from stdin')
+            self.intake = sys.stdin.buffer
+        if not self.outtake:
+            log.info('write to stdout')
+            self.outtake = sys.stdout.buffer
+
+    def _handle_getpin(self, parameters):
+        # convert parameters and command again to plaintext assuan request
+        parameter_string = ''
+        if parameters is not None:
+            parameter_string = parameters
+        encoded_parameters = assuan.common.encode(parameter_string)
+        assuan_input = f'GETPIN {encoded_parameters}'.strip()
+        assuan_input = f'{assuan_input}\n'
+        log.info(f'PC: {assuan_input}')
+        # p = subprocess.Popen(
+        #     [self.fallback_server_program],
+        #     shell=True,
+        #     stdout=subprocess.PIPE,
+        #     stdin=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        # )
+        # p = self.fallback_popen
+        # p.stdin.write(assuan.common.to_bytes(assuan_input))
+        # p.stdin.flush()
+        # p.wait()
+        # output = p.stdout.read()
+        # err = p.stderr.read()
+        # output, err = '', ''
+        # while p.poll() is None:
+        #     output = p.stdout.read()
+        #     err = p.stderr.read()
+        # output, err = p.communicate(input=assuan.common.to_bytes(assuan_input), timeout=86400)
+        # output, err = p.communicate(timeout=86400)
+        # if self.fallback_popen.poll() is not None:
+        #     self._start_fallback_server()
+
+        self.fallback_stream_fifo_in.write(assuan_input)
+        self.fallback_stream_fifo_in.flush()
+
+        # def _opener(path, flags):
+        #     return os.open(path, flags | os.O_NONBLOCK)
+
+        # with open(self.fallback_fifo_out, 'rb', opener=_opener) as outs:
+        #     output = outs.read()
+        # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
+        #     err = errs.read()
+
+        time.sleep(1)
+        output = b''
+        while chunk := self.fallback_stream_fifo_out.read():
+            output += chunk
+
+        err = None
+        # err = self.fallback_stream_fifo_err.read()
+        # p = self.fallback_popen
+        # p.stdin.write(assuan.common.to_bytes(assuan_input))
+        # p.stdin.flush()
+        # output = p.stdout.read()
+        # err = p.stderr.read()
+
+        if err is not None and len(err) != 0:
+            log.error(f'PE: {err}')
+        if output is None:
+            output = b''
+        log.info(f'PS: {output}')
+        # output can be multiple lines of assuan responses
+        responses = []
+        for line in output.decode('utf-8').split('\n'):
+            if len(line) == 0:
+                continue
+            response = assuan.Response()
+            response_string = assuan.common.encode(line)
+            response.from_bytes(assuan.common.to_bytes(response_string))
+            responses.append(response)
+        return responses
+
+    def _handle_setkeyinfo(self, parameters):
+        # convert parameters and command again to plaintext assuan request
+        parameter_string = ''
+        if parameters is not None:
+            parameter_string = parameters
+        encoded_parameters = assuan.common.encode(parameter_string)
+        assuan_input = f'SETKEYINFO {encoded_parameters}'.strip()
+        assuan_input = f'{assuan_input}\n'
+        log.info(f'PC: {assuan_input}')
+        # p = subprocess.Popen(
+        #     [self.fallback_server_program],
+        #     shell=True,
+        #     stdout=subprocess.PIPE,
+        #     stdin=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        # )
+        # p = self.fallback_popen
+        # p.stdin.write(assuan.common.to_bytes(assuan_input))
+        # p.stdin.flush()
+        # p.wait()
+        # output = p.stdout.read()
+        # err = p.stderr.read()
+        # output, err = '', ''
+        # while p.poll() is None:
+        #     output = p.stdout.read()
+        #     err = p.stderr.read()
+        # output, err = p.communicate(input=assuan.common.to_bytes(assuan_input), timeout=86400)
+        # output, err = p.communicate(timeout=86400)
+        # if self.fallback_popen.poll() is not None:
+        #     self._start_fallback_server()
+
+        self.fallback_stream_fifo_in.write(assuan_input)
+        self.fallback_stream_fifo_in.flush()
+
+        # def _opener(path, flags):
+        #     return os.open(path, flags | os.O_NONBLOCK)
+
+        # with open(self.fallback_fifo_out, 'rb', opener=_opener) as outs:
+        #     output = outs.read()
+        # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
+        #     err = errs.read()
+
+        time.sleep(1)
+        output = b''
+        while chunk := self.fallback_stream_fifo_out.read():
+            output += chunk
+
+        err = None
+        # err = self.fallback_stream_fifo_err.read()
+        # p = self.fallback_popen
+        # p.stdin.write(assuan.common.to_bytes(assuan_input))
+        # p.stdin.flush()
+        # output = p.stdout.read()
+        # err = p.stderr.read()
+
+        if err is not None and len(err) != 0:
+            log.error(f'PE: {err}')
+        if output is None:
+            output = b''
+        log.info(f'PS: {output}')
+        # output can be multiple lines of assuan responses
+        responses = []
+        for line in output.decode('utf-8').split('\n'):
+            if len(line) == 0:
+                continue
+            response = assuan.Response()
+            response_string = assuan.common.encode(line)
+            response.from_bytes(assuan.common.to_bytes(response_string))
+            responses.append(response)
+        return responses
+
+    def _handle_getinfo(self, parameters):
+        # convert parameters and command again to plaintext assuan request
+        parameter_string = ''
+        if parameters is not None:
+            parameter_string = parameters
+        encoded_parameters = assuan.common.encode(parameter_string)
+        assuan_input = f'GETINFO {encoded_parameters}'.strip()
+        assuan_input = f'{assuan_input}\n'
+        log.info(f'PC: {assuan_input}')
+        # p = subprocess.Popen(
+        #     [self.fallback_server_program],
+        #     shell=True,
+        #     stdout=subprocess.PIPE,
+        #     stdin=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        # )
+        # p = self.fallback_popen
+        # p.stdin.write(assuan.common.to_bytes(assuan_input))
+        # p.stdin.flush()
+        # p.wait()
+        # output = p.stdout.read()
+        # err = p.stderr.read()
+        # output, err = '', ''
+        # while p.poll() is None:
+        #     output = p.stdout.read()
+        #     err = p.stderr.read()
+        # output, err = p.communicate(input=assuan.common.to_bytes(assuan_input), timeout=86400)
+        # output, err = p.communicate(timeout=86400)
+        # if self.fallback_popen.poll() is not None:
+        #     self._start_fallback_server()
+
+        self.fallback_stream_fifo_in.write(assuan_input)
+        self.fallback_stream_fifo_in.flush()
+
+        # def _opener(path, flags):
+        #     return os.open(path, flags | os.O_NONBLOCK)
+
+        # with open(self.fallback_fifo_out, 'rb', opener=_opener) as outs:
+        #     output = outs.read()
+        # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
+        #     err = errs.read()
+
+        time.sleep(1)
+        output = b''
+        while chunk := self.fallback_stream_fifo_out.read():
+            output += chunk
+
+        err = None
+        # err = self.fallback_stream_fifo_err.read()
+        # p = self.fallback_popen
+        # p.stdin.write(assuan.common.to_bytes(assuan_input))
+        # p.stdin.flush()
+        # output = p.stdout.read()
+        # err = p.stderr.read()
+
+        if err is not None and len(err) != 0:
+            log.error(f'PE: {err}')
+        if output is None:
+            output = b''
+        log.info(f'PS: {output}')
+        # output can be multiple lines of assuan responses
+        responses = []
+        for line in output.decode('utf-8').split('\n'):
+            if len(line) == 0:
+                continue
+            response = assuan.Response()
+            response_string = assuan.common.encode(line)
+            response.from_bytes(assuan.common.to_bytes(response_string))
+            responses.append(response)
+        return responses
+
+    def _start_fallback_server(self):
+
+        def _opener(path, flags):
+            return os.open(path, flags | os.O_NONBLOCK)
+
+        self.fallback_popen = subprocess.Popen(
+            f'{self.fallback_server_program}<{self.fallback_fifo_in}>{self.fallback_fifo_out}',
+            # stdout=subprocess.PIPE,
+            # stderr=subprocess.PIPE,
+            shell=True,
+        )
+
+        # self.fallback_popen = subprocess.Popen(
+        #     [self.fallback_server_program],
+        #     stdout=subprocess.PIPE,
+        #     stderr=subprocess.PIPE,
+        #     stdin=subprocess.PIPE,
+        # )
+
+        while True:
+            try:
+                self.fallback_stream_fifo_in = open(self.fallback_fifo_in, "w")
+                self.fallback_stream_fifo_out = open(self.fallback_fifo_out, "rb")
+                log.info(self.fallback_stream_fifo_out)
+                while chunk := self.fallback_stream_fifo_out.read():
+                    log.info(chunk)
+                # self.fallback_stream_fifo_err = open(self.fallback_fifo_err, "rb")
+                break
+            except OSError as e:
+                log.info(e)
+                time.sleep(5)
+
 
     def _handle_bye(self, arg: str) -> Generator['Response', None, None]:
         """BYE command requires us to close fallback server and our own proxy server"""
         for response in super()._handle_bye(arg):
             yield response
         self.disconnect()
+        self.fallback_popen.terminate()
         yield assuan.Response('OK', 'closing proxy connection')
 
     def _register_fallback_command(self, request: assuan.Request, override=False):
@@ -48,25 +350,59 @@ class ProxyAssuanServer(assuan.AssuanServer):
                 if parameters is not None:
                     parameter_string = parameters
                 encoded_parameters = assuan.common.encode(parameter_string)
-                assuan_input = f'{request.command} {encoded_parameters}\n'
+                assuan_input = f'{request.command} {encoded_parameters}'.strip()
+                assuan_input = f'{assuan_input}\n'
                 log.info(f'PC: {assuan_input}')
-                p = subprocess.Popen(
-                    [self.fallback_server_program],
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stdin=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
+                # p = subprocess.Popen(
+                #     [self.fallback_server_program],
+                #     shell=True,
+                #     stdout=subprocess.PIPE,
+                #     stdin=subprocess.PIPE,
+                #     stderr=subprocess.PIPE,
+                # )
                 # p = self.fallback_popen
                 # p.stdin.write(assuan.common.to_bytes(assuan_input))
                 # p.stdin.flush()
-                # output, err = '',''
+                # p.wait()
+                # output = p.stdout.read()
+                # err = p.stderr.read()
+                # output, err = '', ''
                 # while p.poll() is None:
                 #     output = p.stdout.read()
                 #     err = p.stderr.read()
-                output, err = p.communicate(input=assuan.common.to_bytes(assuan_input), timeout=86400)
+                # output, err = p.communicate(input=assuan.common.to_bytes(assuan_input), timeout=86400)
+                # output, err = p.communicate(timeout=86400)
+                # if self.fallback_popen.poll() is not None:
+                #     self._start_fallback_server()
+
+                self.fallback_stream_fifo_in.write(assuan_input)
+                self.fallback_stream_fifo_in.flush()
+
+                # def _opener(path, flags):
+                #     return os.open(path, flags | os.O_NONBLOCK)
+
+                # with open(self.fallback_fifo_out, 'rb', opener=_opener) as outs:
+                #     output = outs.read()
+                # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
+                #     err = errs.read()
+
+                time.sleep(1)
+                output = b''
+                while chunk := self.fallback_stream_fifo_out.read():
+                    output += chunk
+
+                err = None
+                # err = self.fallback_stream_fifo_err.read()
+                # p = self.fallback_popen
+                # p.stdin.write(assuan.common.to_bytes(assuan_input))
+                # p.stdin.flush()
+                # output = p.stdout.read()
+                # err = p.stderr.read()
+
                 if err is not None and len(err) != 0:
                     log.error(f'PE: {err}')
+                if output is None:
+                    output = b''
                 log.info(f'PS: {output}')
                 # output can be multiple lines of assuan responses
                 responses = []
