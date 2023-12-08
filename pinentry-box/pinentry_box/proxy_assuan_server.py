@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import subprocess
@@ -81,6 +82,14 @@ class ProxyAssuanServer(assuan.AssuanServer):
         if not self.outtake:
             log.info('write to stdout')
             self.outtake = sys.stdout.buffer
+        # self.reconnect_outtake()
+
+    def reconnect_outtake(self):
+        fileno = sys.stdout.fileno()
+        encoding = sys.stdout.encoding
+        line_buffering = sys.stdout.line_buffering
+        sys.stdout = io.TextIOWrapper(open(fileno, 'wb'), encoding=encoding, line_buffering=True)
+        self.outtake = sys.stdout.buffer
 
     def _handle_getpin(self, parameters):
         # convert parameters and command again to plaintext assuan request
@@ -124,7 +133,7 @@ class ProxyAssuanServer(assuan.AssuanServer):
         # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
         #     err = errs.read()
 
-        time.sleep(1)
+        time.sleep(0.5)
         output = b''
         while chunk := self.fallback_stream_fifo_out.read():
             output += chunk
@@ -195,7 +204,7 @@ class ProxyAssuanServer(assuan.AssuanServer):
         # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
         #     err = errs.read()
 
-        time.sleep(1)
+        time.sleep(0.5)
         output = b''
         while chunk := self.fallback_stream_fifo_out.read():
             output += chunk
@@ -266,7 +275,7 @@ class ProxyAssuanServer(assuan.AssuanServer):
         # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
         #     err = errs.read()
 
-        time.sleep(1)
+        time.sleep(0.5)
         output = b''
         while chunk := self.fallback_stream_fifo_out.read():
             output += chunk
@@ -319,6 +328,8 @@ class ProxyAssuanServer(assuan.AssuanServer):
                 self.fallback_stream_fifo_in = open(self.fallback_fifo_in, "w")
                 self.fallback_stream_fifo_out = open(self.fallback_fifo_out, "rb")
                 log.info(self.fallback_stream_fifo_out)
+                self.fallback_stream_fifo_in.flush()
+                time.sleep(0.5)
                 while chunk := self.fallback_stream_fifo_out.read():
                     log.info(chunk)
                 # self.fallback_stream_fifo_err = open(self.fallback_fifo_err, "rb")
@@ -386,7 +397,7 @@ class ProxyAssuanServer(assuan.AssuanServer):
                 # with open(self.fallback_fifo_err, 'rb', opener=_opener) as errs:
                 #     err = errs.read()
 
-                time.sleep(1)
+                time.sleep(0.5)
                 output = b''
                 while chunk := self.fallback_stream_fifo_out.read():
                     output += chunk
@@ -487,9 +498,11 @@ class ProxyAssuanServer(assuan.AssuanServer):
             try:
                 self.outtake.flush()
             except BrokenPipeError:
-                log.info(f'PS: {response}')
-                if not self.stop:
-                    raise
+                self.reconnect_outtake()
+                self.__send_response(response)
+                # log.info(f'PS: {response}')
+                # if not self.stop:
+                #     raise
             except IOError:
                 if not self.stop:
                     raise

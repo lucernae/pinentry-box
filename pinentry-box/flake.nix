@@ -28,7 +28,7 @@
             };
           };
           pinentry_box_cli = writeShellApplication {
-            name = "pinentry-box";
+            name = "pinentry_box";
             text = ''
             export PINENTRY_BOX_FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
             stty sane
@@ -42,7 +42,7 @@
 
         apps.default = {
           type = "app";
-          program = "${self.packages.${system}.pinentry_box_cli}/bin/pinentry-box";
+          program = "${self.packages.${system}.pinentry_box_cli}/bin/pinentry_box";
         };
 
         devShells.default = pkgs.mkShell {
