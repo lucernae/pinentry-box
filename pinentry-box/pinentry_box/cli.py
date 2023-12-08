@@ -35,7 +35,7 @@ def main():
     logging.getLogger(__name__).setLevel(logging.CRITICAL)
     logging.getLogger('assuan').setLevel(log_level)
     logging.info('test logging')
-    pinentry_mac_program = '/nix/store/ckc8kwsqjzgigwak9q1jkag4axv2c2mm-pinentry-mac-1.1.1.1/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac'
+    pinentry_mac_program = 'pinentry-mac'
     pinentry_fallback = os.getenv('PINENTRY_BOX_FALLBACK', pinentry_mac_program)
     logging.info(f'Using pinentry fallback: {pinentry_fallback}')
 
