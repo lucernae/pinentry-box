@@ -45,14 +45,21 @@ def main():
         pycharm_debug_mode = False
     logging.info(f'Using debug mode: {pycharm_debug_mode}')
     if pycharm_debug_mode:
-        import pydevd_pycharm
-        pydevd_pycharm.settrace(
-            app_config.pinentry_box.pycharm_debug.host,
-            port=app_config.pinentry_box.pycharm_debug.port,
-            stdoutToServer=True,
-            stderrToServer=True)
+        try:
+            import pydevd_pycharm
+            pydevd_pycharm.settrace(
+                app_config.pinentry_box.pycharm_debug.host,
+                port=app_config.pinentry_box.pycharm_debug.port,
+                stdoutToServer=True,
+                stderrToServer=True)
+        except Exception:
+            # bypass if there are no debug server
+            pass
 
-    server = ProxyAssuanServer(name='pinentry-box', fallback_server_program=pinentry_fallback)
+    server = ProxyAssuanServer(
+        name='pinentry-box',
+        app_config=app_config,
+        fallback_server_program=pinentry_fallback)
     # to test something via debugger flow, use this to avoid IO blocking:
     # server.intake = io.BytesIO(b'BYE\n')
     server.run()

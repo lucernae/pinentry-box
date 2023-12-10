@@ -1,16 +1,16 @@
-import io
 import logging
 import os
 import subprocess
-import sys
 import tempfile
 import time
-import traceback
 from typing import Optional, Generator
 
 import assuan
-from assuan import common, Request, Response, AssuanError
+from assuan import Response
 from assuan.common import VarText
+
+from pinentry_box import config
+from pinentry_box.config import AppConfig
 
 log = logging.getLogger(__name__)
 
@@ -20,7 +20,10 @@ class ProxyAssuanServer(assuan.AssuanServer):
     then forward the exchange to another Assuan Server
     """
 
-    def __init__(self, fallback_server_program=None, with_sleep=False, with_sleep_duration=0.5, **kwargs):
+    def __init__(self, app_config: config.AppConfig = None, fallback_server_program=None, with_sleep=False, with_sleep_duration=0.5, **kwargs):
+        self.config = app_config
+        if self.config is None:
+            self.config = AppConfig.defaults()
         self.fallback_server_program = fallback_server_program
         self.with_sleep = with_sleep
         self.with_sleep_duration = with_sleep_duration
@@ -101,7 +104,6 @@ class ProxyAssuanServer(assuan.AssuanServer):
             while chunk := self.fallback_stream_fifo_out.read():
                 output += chunk
             self._wait_for_fallback_output()
-        log.info(f'PS: {output}')
         # output can be multiple lines of assuan responses
         responses = []
         for line in output.decode('utf-8').split('\n'):
@@ -134,7 +136,19 @@ class ProxyAssuanServer(assuan.AssuanServer):
                 self.fallback_stream_fifo_in.write('\n')
                 self.fallback_stream_fifo_in.flush()
 
-                return self._read_fallback_responses()
+                responses = self._read_fallback_responses()
+                assuan_output = ''
+                for r in responses:
+                    parameter_string = ''
+                    if parameters is not None:
+                        parameter_string = parameters
+                    encoded_parameters = assuan.common.encode(parameter_string)
+                    # masked the secret
+                    if self.config.pinentry_box.log_getpin_redacted and r.message == 'D' and request.command.lower() == 'getpin':
+                        encoded_parameters = '[REDACTED]'
+                    assuan_output += f'{r.message} {encoded_parameters}\n'
+                log.info(f'PS: {assuan_output}')
+                return responses
 
             setattr(self, f"_handle_{request.command.lower()}", handle_func)
 
