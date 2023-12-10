@@ -1,49 +1,56 @@
 #!/usr/bin/env python
-import io
 import logging
 import os.path
-import assuan
 
+from pydantic import ValidationError
+
+from pinentry_box import config
 from pinentry_box.proxy_assuan_server import ProxyAssuanServer
 
 
-def default_gpg_socket_location():
-    return os.path.expanduser('~/.gnupg/S.gpg-agent')
-
-
-def client_debug():
-    client = assuan.AssuanClient(name='pinentry-box')
-    try:
-        socket_location = default_gpg_socket_location()
-        print(socket_location)
-        client.connect(socket_location)
-        r = assuan.Request(command='HELP')
-        responses, data = client.make_request(request=r, response=True)
-        print(responses)
-        print(data)
-        for r in responses:
-            print(r)
-    finally:
-        client.disconnect()
-
-
 def main():
-    log_level = logging.DEBUG
-    root_logger = logging.getLogger()
-    root_logger.setLevel(log_level)
-    logging.basicConfig(filename='/tmp/pinentry-box.log', filemode='w', level=log_level)
-    logging.getLogger(__name__).setLevel(logging.CRITICAL)
-    logging.getLogger('assuan').setLevel(log_level)
-    logging.info('test logging')
-    pinentry_mac_program = 'pinentry-mac'
-    pinentry_fallback = os.getenv('PINENTRY_BOX_FALLBACK', pinentry_mac_program)
+    app_config = None
+    config_path_lists = [
+        os.path.curdir,
+        os.path.join(os.path.abspath('~'), 'local')
+    ]
+    for cp in config_path_lists:
+        try:
+            app_config = config.AppConfig.model_yaml_file_validate(
+                os.path.abspath(os.path.join(cp, '.pinentry-box.yaml'))
+            )
+        except FileNotFoundError:
+            pass
+        except ValidationError:
+            pass
+        finally:
+            if app_config is not None:
+                break
+
+    if app_config is None:
+        app_config = config.AppConfig.defaults()
+
+    logging.basicConfig(
+        filename=app_config.pinentry_box.log_file,
+        filemode='w',
+        level=app_config.pinentry_box.log_level)
+    logging.getLogger().setLevel(app_config.pinentry_box.log_level)
+    pinentry_fallback = os.getenv('PINENTRY_BOX__FALLBACK', app_config.pinentry_box.fallback)
     logging.info(f'Using pinentry fallback: {pinentry_fallback}')
 
-    pycharm_debug_mode = os.getenv('PYCHARM_DEBUG_MODE', '0')
+    pycharm_debug_mode = os.getenv('PINENTRY_BOX__PYCHARM_DEBUG__ENABLE', app_config.pinentry_box.pycharm_debug.enable)
+    if pycharm_debug_mode == '1' or pycharm_debug_mode == True:
+        pycharm_debug_mode = True
+    else:
+        pycharm_debug_mode = False
     logging.info(f'Using debug mode: {pycharm_debug_mode}')
-    if pycharm_debug_mode == '1':
+    if pycharm_debug_mode:
         import pydevd_pycharm
-        pydevd_pycharm.settrace('localhost', port=6113, stdoutToServer=True, stderrToServer=True)
+        pydevd_pycharm.settrace(
+            app_config.pinentry_box.pycharm_debug.host,
+            port=app_config.pinentry_box.pycharm_debug.port,
+            stdoutToServer=True,
+            stderrToServer=True)
 
     server = ProxyAssuanServer(name='pinentry-box', fallback_server_program=pinentry_fallback)
     # to test something via debugger flow, use this to avoid IO blocking:

@@ -1,0 +1,19 @@
+pinentry_box:
+  log_level: ERROR # default log level for pinentry_box module
+  log_file: /tmp/.pinentry-box # default location for the log file
+  log_getpin_redacted: true # mask the getpin value logs to not reveal the secret
+  fallback: pinentry-mac # fallback program of the pinentry
+  pycharm_debug: # for PyCharm debugging
+    enable: false #
+    port: 6113
+    host: localhost
+forwards:
+  - program:
+    # conditions is a map of regexp matcher
+    # if conditions is fulfilled then the pinentry program of `program` is going to be executed
+    # each condition is a list of regexp
+    conditions:
+      title:
+      desc:
+      prompt:
+      keyinfo:

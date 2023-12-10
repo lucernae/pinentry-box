@@ -30,7 +30,7 @@
           pinentry_box_cli = writeShellApplication {
             name = "pinentry_box";
             text = ''
-            export PINENTRY_BOX_FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
+            export PINENTRY_BOX__FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
             stty sane
             ${self.packages.${system}.pinentry_box}/bin/pinentry_box
             '';
@@ -55,7 +55,7 @@
             pkgs.pinentry_mac
            ];
           shellHook = ''
-          export PINENTRY_BOX_FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
+          export PINENTRY_BOX__FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
           stty sane
           '';
         };
