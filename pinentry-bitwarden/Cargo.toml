@@ -1,0 +1,16 @@
+[package]
+name = "pinentry-bitwarden"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitwarden = { git="https://github.com/bitwarden/sdk", version = "0.3.1", features = ["secrets"] }
+uuid = "1.6.1"
+tokio = { version = "1.35.0", features = ["macros"]}
+
+
+[features]
+internal = ["bitwarden/internal"]
+mobile = ["bitwarden/mobile"]
