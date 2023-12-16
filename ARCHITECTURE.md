@@ -17,5 +17,3 @@
  `integration`:
  - Use Nix Darwin/NixOS module/flake to describe the integration. Well, basically swaps gpg-agent.conf `pinentry-program` config with `pinentry-box`, then generate config for `pinentry-box` to use `pinentry-bitwarden` and `pinentry-mac`.
  - Use Nix flake to integrate it with Git and VSCode config, so that signing commit can happen seamlessly.
-
- 

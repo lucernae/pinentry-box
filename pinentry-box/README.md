@@ -52,7 +52,7 @@ Note: we currently have no Linux dev support, although it can easily be forwarde
 You can also run using poetry as usual
 
 ```shell
-poetry run pinentry_box 
+poetry run pinentry_box
 ```
 
 Poetry will run it in development mode. To test the build mode, use the executable inside the build directory
@@ -79,7 +79,7 @@ nix run '<location of the flake.nix file'
 
 GPG usually put the config file in `~/.gnupg/gpg-agent.conf`.
 Replace or add the `pinentry-program` key with the absolute path location of the `./result/bin/pinentry_box` program.
-The program in `./result/bin/pinentry_box` is a poetry scripts in editable mode. 
+The program in `./result/bin/pinentry_box` is a poetry scripts in editable mode.
 So if you modify existing files in the project, it should be in effect immediately.
 
 ## GPG cookbook
@@ -93,18 +93,18 @@ This is a sample communication when signing a message.
 
 ```mermaid
 sequenceDiagram
-    
-    participant u as User
+
+    participant u as User/CLI
     participant g as GPG-Agent
     participant p as pinentry
-    
+
     u->>g: request message signing using key
     g->>g: finding pulic/private key pair
     g->>p: requesting PIN/passphrase to decrypt private key
     p->>u: show dialog to input PIN, passphrase, 2fa, whatever
     u->>p: submit secret/authorization
-    p->>g: (unsure who does the decryption), decrypt the private key
-    g->>g: cache and uses the private key to sign the message
+    p->>g: sends passphrase
+    g->>g: unlocks private key, cache it, and uses it to sign the message
     g->>u: returned signed or encrypted or digital sign hash of the message
 ```
 
@@ -128,4 +128,3 @@ Decrypting message
 ```shell
 gpg tmp/testfile.txt.asc
 ```
-

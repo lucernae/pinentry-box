@@ -14,7 +14,7 @@ flowchart LR
 ```
 
 Notice that pinentry-box will filter which secret key can be retrieved from which vault.
-So we can have a loop-back. 
+So we can have a loop-back.
 For example, if your GPG passphrase is stored in Bitwarden, pinentry-box can try to retrieve it from bitwarden, but Bitwarden needs to be unlocked and can ask back to pinentry-box, in which it will ask MacOS Keychain.
 
 This allows for more flexibility when integrating with different OS or environment as well.

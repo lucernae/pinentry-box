@@ -1,6 +1,6 @@
 # Pinentry Box Documentation
 
-## Installing Pinentry Box 
+## Installing Pinentry Box
 
 **Not Yet Implemented**
 

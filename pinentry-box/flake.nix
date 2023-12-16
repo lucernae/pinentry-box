@@ -8,9 +8,13 @@
       url = "github:nix-community/poetry2nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    devshell.url = "github:numtide/devshell";
+
+    # flake in subdirectory
+    common.url = "git+file:..?dir=common";
   };
 
-  outputs = { self, nixpkgs, flake-utils, poetry2nix }:
+  outputs = { self, devshell, nixpkgs, flake-utils, common, poetry2nix }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         # see https://github.com/nix-community/poetry2nix/tree/master#api for more functions and examples.
@@ -20,20 +24,40 @@
       in
       {
         packages = {
-          pinentry_box = mkPoetryEnv {
-            projectDir = self;
-            preferWheels = true;
-            editablePackageSources = {
+          # this package is the base poetry package/environment that will be reused in this flake
+          pinentry_box = mkPoetryEnv
+            {
+              projectDir = self;
+              preferWheels = true;
+              editablePackageSources = {
                 pinentry_box = self;
+              };
+            } // {
+            meta = {
+              description = "Pinentry forwarder program";
             };
           };
+          # pinentry-mac CLI
+          pinentry_mac = writeShellApplication {
+            name = "pinentry-mac";
+            text = ''
+              exec "${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac" "$@"
+            '';
+            meta = pkgs.pinentry_mac.meta;
+          };
+          pinentry_fallback = if pkgs.stdenv.isDarwin then self.packages.${system}.pinentry_mac else self.packages.${system}.pinentry;
+          # the standalone CLI to be exposed
           pinentry_box_cli = writeShellApplication {
             name = "pinentry_box";
-            text = ''
-            export PINENTRY_BOX__FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
-            stty sane
-            ${self.packages.${system}.pinentry_box}/bin/pinentry_box
-            '';
+            text =
+              let
+                pinentry_fallback = self.packages.${system}.pinentry_fallback;
+              in
+              ''
+                export PINENTRY_BOX__FALLBACK="${pinentry_fallback}/bin/${pinentry_fallback.meta.mainProgram}"
+                stty sane
+                exec "${self.packages.${system}.pinentry_box}/bin/pinentry_box" "$@"
+              '';
           };
           default = self.packages.${system}.pinentry_box;
         };
@@ -45,19 +69,56 @@
           program = "${self.packages.${system}.pinentry_box_cli}/bin/pinentry_box";
         };
 
-        devShells.default = pkgs.mkShell {
+        devShells.native = pkgs.mkShell {
           inputsFrom = [
             self.packages.${system}.pinentry_box
-           ];
+          ];
           packages = [
             pkgs.poetry
-            # fallback pinentry to be used
-            pkgs.pinentry_mac
-           ];
-          shellHook = ''
-          export PINENTRY_BOX__FALLBACK="${pkgs.pinentry_mac}/Applications/pinentry-mac.app/Contents/MacOS/pinentry-mac"
-          stty sane
-          '';
+            pkgs.pre-commit
+            # fallback pinentry-mac
+            self.packages.${system}.pinentry_fallback
+          ];
+          shellHook =
+            let
+              pinentry_fallback = self.packages.${system}.pinentry_fallback;
+            in
+            ''
+              export PINENTRY_BOX__FALLBACK="${pinentry_fallback}/bin/${pinentry_fallback.meta.mainProgram}"
+              stty sane
+            '';
         };
+
+        devShells.devshell =
+          let
+            pkgs = import nixpkgs {
+              inherit system;
+              overlays = [ devshell.overlays.default ];
+            };
+          in
+          pkgs.devshell.mkShell {
+            name = "pinentry-box";
+            commands = [
+              {
+                name = "pinentry_box";
+                package = self.packages.${system}.pinentry_box;
+              }
+              {
+                name = "pinentry-mac";
+                package = self.packages.${system}.pinentry_mac;
+              }
+            ] ++ (builtins.filter (v: v.name != "menu") common.devShells.${system}.default.config.commands);
+            env = [
+              {
+                name = "PINENTRY_BOX__FALLBACK";
+                value =
+                  let
+                    pinentry_fallback = self.packages.${system}.pinentry_fallback;
+                  in
+                  "${pinentry_fallback}/bin/${pinentry_fallback.meta.mainProgram}";
+              }
+            ];
+          };
+        devShells.default = self.devShells.${system}.devshell;
       });
 }
