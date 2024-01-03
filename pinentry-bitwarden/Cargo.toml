@@ -8,12 +8,20 @@ edition = "2021"
 [dependencies]
 bitwarden = { git="https://github.com/bitwarden/sdk", version = "0.3.1", features = ["secrets"] }
 uuid = "1.6.1"
-tokio = { version = "1.35.0", features = ["macros"]}
+tokio = { version = "1.35.0", features = ["macros", "net", "fs", "process"]}
 sequoia-ipc = { version = "0.31.0" }
 sequoia-openpgp = { version = "1.17.0", features = ["crypto-openssl"], default-features = false }
 gpg-error = { git = "https://github.com/rehar/libgpg-error.git", version = "0.6.0" }
 clap = { version = "4.4.11", features = ["derive", "env", "string", "wrap_help"] }
 futures = "0.3.29"
+serde = { version = "1.0.193", features = ["derive", "std"] }
+serde_yaml = { version = "0.9.27" }
+schemars = { version = "0.8.16", features = ["derive", "derive_json_schema"] }
+directories = { version = "5.0.1" }
+which ={ version = "5.0.0"}
+tempfile = { version = "3.8.1" }
+anyhow = { version = "1.0.75", features = [] }
+expanduser = {version = "1.2.2", features = []}
 
 
 [features]
