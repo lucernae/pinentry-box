@@ -16,7 +16,8 @@ from pinentry_box.proxy_assuan_server import ProxyAssuanServer
 @click.command()
 @click.option('--socket-path', help='Unix Socket to start server mode')
 @click.option('--start-server/--start-shell', default=False, help='Start pinentry as socket server mode')
-def main(socket_path=None, start_server=False):
+@click.option('--start-daemon/--no-start-daemon', default=False, help='Start pinentry as socket server in daemon mode')
+def main(socket_path=None, start_server=False, start_daemon=False):
     app_config = None
     home_dir_config_path = os.path.join(os.path.expanduser('~'), '.config')
     config_path_lists = [
@@ -81,6 +82,11 @@ def main(socket_path=None, start_server=False):
             fallback_server_program=pinentry_fallback)
         server.run()
     else:
+        if start_daemon:
+            pid = os.fork()
+            if pid > 0:
+                return
+
         socket_path = socket_path or str(app_config.pinentry_box.socket_server_path)
         try:
             os.remove(socket_path)
