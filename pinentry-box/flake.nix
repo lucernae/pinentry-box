@@ -48,7 +48,7 @@
           };
           pinentry_fallback = if pkgs.stdenv.isDarwin then self.packages.${system}.pinentry_mac else self.packages.${system}.pinentry;
           # the standalone CLI to be exposed
-          pinentry_box_cli = writeShellApplication {
+          pinentry_box_cli_with_env = writeShellApplication {
             name = "pinentry-box";
             text =
               let
@@ -57,6 +57,16 @@
               ''
                 export PINENTRY_BOX__FALLBACK="${pinentry_fallback}/bin/${pinentry_fallback.meta.mainProgram}"
                 stty sane
+                exec "${self.packages.${system}.pinentry_box}/bin/pinentry-box" "$@"
+              '';
+          };
+          pinentry_box_cli = writeShellApplication {
+            name = "pinentry-box";
+            text =
+              let
+                pinentry_fallback = self.packages.${system}.pinentry_fallback;
+              in
+              ''
                 exec "${self.packages.${system}.pinentry_box}/bin/pinentry-box" "$@"
               '';
           };
