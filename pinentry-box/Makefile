@@ -13,4 +13,4 @@ test-sign:
 	direnv exec . bash -c 'gpg --trust-model always --encrypt --sign --armor -r "$${EMAIL}" -o tmp/testfile.txt.asc testfile.txt'
 
 tail-log:
-	tail -f /tmp/pinentry-box.log -n 100
+	tail -f /tmp/.pinentry-box -n 100

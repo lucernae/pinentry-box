@@ -84,7 +84,6 @@ class ProxyAssuanServer(assuan.AssuanServer):
         """BYE command requires us to close fallback server and our own proxy server"""
         for _ in super()._handle_bye(arg):
             pass
-        self.disconnect()
         try:
             self.fallback_stream_fifo_in.write('BYE\n')
             self.fallback_stream_fifo_in.flush()

@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 import logging
 import os.path
+import socket
+
+import assuan
+import click
+import yaml
 
 from pydantic import ValidationError
 
@@ -8,17 +13,23 @@ from pinentry_box import config
 from pinentry_box.proxy_assuan_server import ProxyAssuanServer
 
 
-def main():
+@click.command()
+@click.option('--socket-path', help='Unix Socket to start server mode')
+@click.option('--start-server/--start-shell', default=False, help='Start pinentry as socket server mode')
+def main(socket_path=None, start_server=False):
     app_config = None
+    home_dir_config_path = os.path.join(os.path.expanduser('~'), '.config')
     config_path_lists = [
         os.path.curdir,
-        os.path.join(os.path.abspath('~'), 'local')
+        home_dir_config_path
     ]
+    config_file_found = False
     for cp in config_path_lists:
         try:
             app_config = config.AppConfig.model_yaml_file_validate(
                 os.path.abspath(os.path.join(cp, '.pinentry-box.yaml'))
             )
+            config_file_found = True
         except FileNotFoundError:
             pass
         except ValidationError:
@@ -29,6 +40,11 @@ def main():
 
     if app_config is None:
         app_config = config.AppConfig.defaults()
+
+    # write config
+    if not config_file_found:
+        with open(os.path.join(home_dir_config_path, '.pinentry-box.yaml'), 'w') as f:
+            yaml.dump(app_config.dict(), f)
 
     logging.basicConfig(
         filename=app_config.pinentry_box.log_file,
@@ -55,14 +71,34 @@ def main():
         except Exception:
             # bypass if there are no debug server
             pass
-
-    server = ProxyAssuanServer(
-        name='pinentry-box',
-        app_config=app_config,
-        fallback_server_program=pinentry_fallback)
     # to test something via debugger flow, use this to avoid IO blocking:
     # server.intake = io.BytesIO(b'BYE\n')
-    server.run()
+    if not start_server:
+
+        server = ProxyAssuanServer(
+            name='pinentry-box',
+            app_config=app_config,
+            fallback_server_program=pinentry_fallback)
+        server.run()
+    else:
+        socket_path = socket_path or str(app_config.pinentry_box.socket_server_path)
+        try:
+            os.remove(socket_path)
+        except FileNotFoundError:
+            pass
+        unix_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        unix_socket.bind(socket_path)
+        unix_socket.listen(1)
+        server = assuan.AssuanSocketServer(
+            name='pinentry-box',
+            socket=unix_socket,
+            server=ProxyAssuanServer,
+            app_config=app_config,
+            fallback_server_program=pinentry_fallback,
+        )
+        print(f'D {socket_path}')
+        print(f'OK Server started with socket')
+        server.run()
 
 
 if __name__ == '__main__':

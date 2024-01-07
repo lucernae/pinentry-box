@@ -35,6 +35,7 @@
             } // {
             meta = {
               description = "Pinentry forwarder program";
+              mainProgram = "pinentry-box";
             };
           };
           # pinentry-mac CLI
@@ -48,7 +49,7 @@
           pinentry_fallback = if pkgs.stdenv.isDarwin then self.packages.${system}.pinentry_mac else self.packages.${system}.pinentry;
           # the standalone CLI to be exposed
           pinentry_box_cli = writeShellApplication {
-            name = "pinentry_box";
+            name = "pinentry-box";
             text =
               let
                 pinentry_fallback = self.packages.${system}.pinentry_fallback;
@@ -56,7 +57,7 @@
               ''
                 export PINENTRY_BOX__FALLBACK="${pinentry_fallback}/bin/${pinentry_fallback.meta.mainProgram}"
                 stty sane
-                exec "${self.packages.${system}.pinentry_box}/bin/pinentry_box" "$@"
+                exec "${self.packages.${system}.pinentry_box}/bin/pinentry-box" "$@"
               '';
           };
           default = self.packages.${system}.pinentry_box;
@@ -66,7 +67,7 @@
 
         apps.default = {
           type = "app";
-          program = "${self.packages.${system}.pinentry_box_cli}/bin/pinentry_box";
+          program = "${self.packages.${system}.pinentry_box_cli}/bin/pinentry-box";
         };
 
         devShells.native = pkgs.mkShell {
@@ -100,7 +101,7 @@
             name = "pinentry-box";
             commands = [
               {
-                name = "pinentry_box";
+                name = "pinentry-box";
                 package = self.packages.${system}.pinentry_box;
               }
               {

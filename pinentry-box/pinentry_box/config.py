@@ -2,6 +2,7 @@ import logging
 import os.path
 import re
 import shutil
+from pathlib import Path
 from typing import List, Annotated, Optional, Any
 
 import yaml
@@ -68,6 +69,7 @@ class PinentryBoxConfig(BaseModel):
     log_getpin_redacted: bool
     fallback: ExecutablePath
     pycharm_debug: PycharmDebug
+    socket_server_path: Path
 
 
 class AppConfig(BaseModel):
@@ -95,6 +97,7 @@ class AppConfig(BaseModel):
                 log_file='/tmp/.pinentry-box',
                 log_getpin_redacted=True,
                 fallback=pinentry_box__fallback,
+                socket_server_path=os.path.expanduser('~/.pinentry-box.sock'),
                 pycharm_debug=PycharmDebug(
                     enable=pinentry_box__pycharm_debug__enable,
                     port=6113,
