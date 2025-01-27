@@ -10,7 +10,6 @@
   outputs = { self, devshell, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        # see https://github.com/nix-community/poetry2nix/tree/master#api for more functions and examples.
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ devshell.overlays.default ];

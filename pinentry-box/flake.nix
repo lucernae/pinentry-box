@@ -11,7 +11,7 @@
     devshell.url = "github:numtide/devshell";
 
     # flake in subdirectory
-    common.url = "git+file:..?dir=common";
+    common.url = "path:../common";
   };
 
   outputs = { self, devshell, nixpkgs, flake-utils, common, poetry2nix }:

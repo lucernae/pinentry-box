@@ -8,7 +8,7 @@
     devshell.url = "github:numtide/devshell";
 
     # flake subdir
-    common.url = "git+file:..?dir=common";
+    common.url = "path:../common";
   };
 
   outputs = { self, nixpkgs, utils, devshell, common, naersk, rust-overlay, ... }:

@@ -7,8 +7,18 @@
     devshell.url = "github:numtide/devshell";
 
     # flake in the subdirectory
-    common.url = "git+file:.?dir=common";
-    pinentry-box.url = "git+file:.?dir=pinentry-box";
+    common = {
+      #      url = "git+file:.?dir=common";
+      #        path = "./common";
+      #        url = "file:./common";
+      url = "path:./common";
+    };
+    pinentry-box = {
+      #      url = "git+file:.?dir=pinentry-box";
+      #        path = "./pinentry-box";
+      #        url = "file:./pinentry-box";
+      url = "path:./pinentry-box";
+    };
   };
 
   outputs = { self, devshell, nixpkgs, flake-utils, common, pinentry-box }:
