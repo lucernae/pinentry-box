@@ -8,7 +8,7 @@
     devshell.url = "github:numtide/devshell";
 
     # flake subdir
-    common.url = "path:../common";
+    common.url = "github:lucernae/pinentry-box?dir=common";
   };
 
   outputs = { self, nixpkgs, utils, devshell, common, naersk, rust-overlay, ... }:

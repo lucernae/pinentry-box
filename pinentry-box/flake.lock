@@ -7,14 +7,19 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-3gX9ZO1qCI8MvROgH7asLQEOaIWnrbX2u7+bLuqvOek=",
-        "path": "../common",
-        "type": "path"
+        "dir": "common",
+        "lastModified": 1737939338,
+        "narHash": "sha256-gbxz4fg3BW34PId77egEqZChJe63SxLEMqZvwFpEWIE=",
+        "owner": "lucernae",
+        "repo": "pinentry-box",
+        "rev": "c775b43bec764161044a4cce898b233ddd1ddd46",
+        "type": "github"
       },
       "original": {
-        "path": "../common",
-        "type": "path"
+        "dir": "common",
+        "owner": "lucernae",
+        "repo": "pinentry-box",
+        "type": "github"
       }
     },
     "devshell": {

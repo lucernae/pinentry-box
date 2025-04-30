@@ -11,7 +11,7 @@
     devshell.url = "github:numtide/devshell";
 
     # flake in subdirectory
-    common.url = "path:../common";
+    common.url = "github:lucernae/pinentry-box?dir=common";
   };
 
   outputs = { self, devshell, nixpkgs, flake-utils, common, poetry2nix }:
