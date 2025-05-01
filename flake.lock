@@ -7,15 +7,14 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-eU3ol9vfSktYE5F79paqCmQmnvYOIDnNFpWPyJVfm/4=",
         "path": "./common",
         "type": "path"
       },
       "original": {
         "path": "./common",
         "type": "path"
-      }
+      },
+      "parent": []
     },
     "common_2": {
       "inputs": {
@@ -24,14 +23,19 @@
         "nixpkgs": "nixpkgs_6"
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-3gX9ZO1qCI8MvROgH7asLQEOaIWnrbX2u7+bLuqvOek=",
-        "path": "../common",
-        "type": "path"
+        "dir": "common",
+        "lastModified": 1745989804,
+        "narHash": "sha256-C7/bnXpgKmhxWoCYNCcSN90tEIkYQ/04n8Eo29jSA0w=",
+        "owner": "lucernae",
+        "repo": "pinentry-box",
+        "rev": "f7fa28225d5face7ee265777c8f7db07f8c1269a",
+        "type": "github"
       },
       "original": {
-        "path": "../common",
-        "type": "path"
+        "dir": "common",
+        "owner": "lucernae",
+        "repo": "pinentry-box",
+        "type": "github"
       }
     },
     "devshell": {
@@ -356,15 +360,14 @@
         "poetry2nix": "poetry2nix"
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-8n4QLeDOkOvvkuiyfppODtYPQk2A85h3J3NZIp4P1+U=",
         "path": "./pinentry-box",
         "type": "path"
       },
       "original": {
         "path": "./pinentry-box",
         "type": "path"
-      }
+      },
+      "parent": []
     },
     "poetry2nix": {
       "inputs": {

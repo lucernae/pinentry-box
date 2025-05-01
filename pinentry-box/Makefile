@@ -9,6 +9,9 @@ build:
 reset-gpg-agent:
 	gpgconf --kill gpg-agent
 
+kill-pinentry-box:
+	kill -TERM $(cat ~/.pinentry-box.pid)
+
 test-sign:
 	direnv exec . bash -c 'gpg --trust-model always --encrypt --sign --armor -r "$${EMAIL}" -o tmp/testfile.txt.asc testfile.txt'
 
