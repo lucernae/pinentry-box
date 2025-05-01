@@ -3,10 +3,10 @@ import os.path
 import re
 import shutil
 from pathlib import Path
-from typing import List, Annotated, Optional, Any
+from typing import List, Annotated, Optional, Any, Tuple
 
 import yaml
-from pydantic import BaseModel, AfterValidator, FilePath, NewPath
+from pydantic import BaseModel, AfterValidator, FilePath, NewPath, ValidationError
 
 
 def _executable_path_validator(v: str) -> str:
@@ -106,3 +106,52 @@ class AppConfig(BaseModel):
             ),
             forwards=[],
         )
+
+def load_config(write_default_config: bool = True) -> Tuple[AppConfig, bool]:
+    """
+    Load application configuration from predefined paths.
+
+    Args:
+        write_default_config: If True and no config file is found, write default config
+
+    Returns:
+        Tuple containing:
+        - The loaded AppConfig object
+        - A boolean indicating whether a config file was found
+    """
+    app_config = None
+    home_dir_config_path = os.path.join(os.path.expanduser('~'), '.config')
+    config_path_lists = [
+        os.path.curdir,
+        home_dir_config_path
+    ]
+    config_file_found = False
+
+    # Try to load config from different paths
+    for cp in config_path_lists:
+        try:
+            app_config = AppConfig.model_yaml_file_validate(
+                os.path.abspath(os.path.join(cp, '.pinentry-box.yaml'))
+            )
+            config_file_found = True
+        except FileNotFoundError:
+            pass
+        except ValidationError:
+            pass
+        finally:
+            if app_config is not None:
+                break
+
+    # Fall back to defaults if no config is found
+    if app_config is None:
+        app_config = AppConfig.defaults()
+
+    # Write default config if requested and no config file was found
+    if write_default_config and not config_file_found:
+        try:
+            with open(os.path.join(home_dir_config_path, '.pinentry-box.yaml'), 'w') as f:
+                yaml.dump(app_config.dict(), f)
+        except Exception as e:
+            logging.warning(f"Failed to write default config: {e}")
+
+    return app_config, config_file_found

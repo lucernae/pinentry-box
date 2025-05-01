@@ -9,8 +9,6 @@ import assuan
 import click
 import yaml
 
-from pydantic import ValidationError
-
 from pinentry_box import config
 from pinentry_box.proxy_assuan_server import ProxyAssuanServer
 
@@ -36,40 +34,14 @@ def signal_handler(signum, frame, socket_path, pid_file):
 @click.option('--start-server/--start-shell', default=False, help='Start pinentry as socket server mode')
 @click.option('--start-daemon/--no-start-daemon', default=False, help='Start pinentry as socket server in daemon mode')
 def main(socket_path=None, start_server=False, start_daemon=False):
-    app_config = None
-    home_dir_config_path = os.path.join(os.path.expanduser('~'), '.config')
-    config_path_lists = [
-        os.path.curdir,
-        home_dir_config_path
-    ]
-    config_file_found = False
-    for cp in config_path_lists:
-        try:
-            app_config = config.AppConfig.model_yaml_file_validate(
-                os.path.abspath(os.path.join(cp, '.pinentry-box.yaml'))
-            )
-            config_file_found = True
-        except FileNotFoundError:
-            pass
-        except ValidationError:
-            pass
-        finally:
-            if app_config is not None:
-                break
-
-    if app_config is None:
-        app_config = config.AppConfig.defaults()
-
-    # write config
-    if not config_file_found:
-        with open(os.path.join(home_dir_config_path, '.pinentry-box.yaml'), 'w') as f:
-            yaml.dump(app_config.dict(), f)
+    app_config, config_file_found = config.load_config()
 
     logging.basicConfig(
         filename=app_config.pinentry_box.log_file,
         filemode='w',
-        level=app_config.pinentry_box.log_level)
-    logging.getLogger().setLevel(app_config.pinentry_box.log_level)
+        level=logging.ERROR)
+    logging.getLogger('root').setLevel(logging.ERROR)
+    logging.getLogger(__name__).setLevel(app_config.pinentry_box.log_level)
     logging.info(f'Logging level: {app_config.pinentry_box.log_level}')
     logging.info(f'config: {app_config.json()}')
     pinentry_fallback = os.getenv('PINENTRY_BOX__FALLBACK', app_config.pinentry_box.fallback)
@@ -94,6 +66,7 @@ def main(socket_path=None, start_server=False, start_daemon=False):
             pass
     # to test something via debugger flow, use this to avoid IO blocking:
     # server.intake = io.BytesIO(b'BYE\n')
+    app_config, config_file_found = config.load_config()
     if not start_server:
 
         server = ProxyAssuanServer(
