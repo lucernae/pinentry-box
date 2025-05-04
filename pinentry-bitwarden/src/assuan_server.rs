@@ -1,19 +1,24 @@
+use anyhow::Result;
+use fork;
+use sequoia_gpg_agent::assuan;
 use std::fmt::Error;
 use std::future::Future;
 use std::path::PathBuf;
-use std::process::{Output, Stdio};
-
-use sequoia_ipc::assuan;
-use sequoia_ipc::assuan::Client;
+use std::process::Stdio;
 use tokio::process::Command;
 
-use crate::config::PinentryConfig;
+use crate::config::{Config, PinentryConfig};
 
 pub struct PinentryBox {
     pub config: PinentryConfig,
     // pub proc: Option<Future<Output=Result<Output>>>,
     // pub proc: Option<BoxedProcResult>,
     // pub proc: Option<Box<dyn futures::Future<Output = io::Result<Output>>>>,
+}
+
+pub struct PinentryBitwarden {
+    pub config: Config,
+    pinentry_box: PinentryBox,
 }
 
 pub enum SocketServerState<T> {
@@ -67,101 +72,58 @@ impl PinentryBox {
         } else {
             let absolute_path = which::which(self.config.program_path.as_str()).unwrap();
             let program_args_slices = (self.config.program_args.as_str()).split_whitespace();
-            let proc = Command::new(absolute_path.to_str().unwrap())
-                .args(program_args_slices)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn();
+            // Use the daemon function to properly detach the process
+            if let Ok(fork::Fork::Child) = fork::daemon(false, false) {
+                let _ = Command::new(absolute_path.to_str().unwrap())
+                    .args(program_args_slices)
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn();
+
+                // Exit the child process after spawning the daemon
+                std::process::exit(0);
+            }
+
+            // The parent process continues here
+            // We can create a fake child result since the actual process is now running as a daemon
+            // This allows the API to remain compatible with existing code
+            let proc = Command::new("true").spawn();
+
             Ok(SocketServerState::Started(proc))
         }
     }
 
-    pub fn connect(&self) -> impl Future<Output = sequoia_ipc::Result<Client>> + Sized {
+    pub fn connect(
+        &self,
+    ) -> impl Future<Output = Result<sequoia_gpg_agent::assuan::Client, sequoia_gpg_agent::Error>>
+    {
         let client = assuan::Client::connect(self.config.socket_path.clone());
         client
     }
 }
 
-// /// AssuanServerCLI used as interface to communicate with pinentry CLI program,
-// /// but using socket
-// pub struct AssuanServerCLI {
-//     pub server_path: PathBuf,
-//     server_socket: PathBuf,
-//     pub client: Pin<Box<dyn Future<Output = (sequoia_ipc::Result<assuan::Client>)>>>,
-//     // proc: Child,
-// }
-//
-// impl<'a> AssuanServerCLI {
-
-// pub
-
-// pub async fn new(server_path: PathBuf) -> Result<AssuanServerCLI, Error> {
-//     let server_socket = match  {  }; NamedTempFile::new().unwrap().path().to_owned();
-//     // let server_socket = PathBuf::from(
-//     //     "/Users/recalune/WorkingDir/github/lucernae/pinentry-box/pinentry-box/.local.sock",
-//     // );
-//     // let socket_listener = UnixListener::bind(&server_socket).ok();
-//     // let stream = UnixStream::connect(&server_socket).unwrap();
-//     // approach 1
-//     // let fd_in = stream.as_raw_fd();
-//     // let fd_out = stream.as_raw_fd();
-//     // let mut proc = Command::new(server_path)
-//     //     .stdin(unsafe { Stdio::from_raw_fd(fd_in) })
-//     //     .stdout(unsafe { Stdio::from_raw_fd(fd_out) })
-//     //     .spawn()
-//     //     .expect("unable to execute CLI");
-//     // approach 2
-//     // let socket_path_str = server_socket.to_str().unwrap();
-//     // let server_path_str = server_path.to_str().unwrap();
-//     // let arg = format!("cat < {socket_path_str} | {server_path_str} > {socket_path_str}");
-//     // let mut proc = Command::new("bash")
-//     //     .arg("-c")
-//     //     .arg(arg)
-//     //     .spawn()
-//     //     .expect("unable to execute CLI");
-//     let socket_path_str = server_socket.to_str().unwrap();
-//     let server_path_str = server_path.to_str().unwrap();
-//     let command_shell = format!("{server_path_str} --socket-path {socket_path_str} &");
-//     let mut proc = Command::new(server_path_str)
-//         .arg("--start-server")
-//         // .arg("--help")
-//         // .arg(command_shell)
-//         // .arg("--socket-path")
-//         // .arg(socket_path_str)
-//         // .stdin(Stdio::null())
-//         // .stdout(Stdio::null())
-//         // .stderr(Stdio::null())
-//         // .spawn()
-//         .output();
-//     // .expect("unable to execute CLI");
-//     // let exit_status = proc.status;
-//     // let output_str = std::str::from_utf8(proc.stdout.as_mut_slice()).unwrap();
-//     // let err_str = std::str::from_utf8(proc.stderr.as_mut_slice()).unwrap();
-//
-//     if let mut response = proc.await.unwrap() {
-//         eprintln!(
-//             "< {:?}",
-//             std::str::from_utf8(response.stdout.as_mut_slice())
-//         );
+// /// A no GUI implementation of pinentry that directly requests secret from Bitwarden Vault or Secrets
+// impl PinentryBitwarden {
+//     pub fn new(config: Config) -> Self {
+//         // Initialize bitwarden CLI client and secrets client from config
+//         // initialize pinentry-box client
+//         PinentryBitwarden {}
 //     }
 //
-//     // let proc = Command::new(server_path_str)
-//     //     .arg("--socket-path")
-//     //     .arg(socket_path_str)
-//     //     .stdin(Stdio::null())
-//     //     .stdout(Stdio::null())
-//     //     .stderr(Stdio::null())
-//     //     .spawn()
-//     //     .expect("unable to execute CLI");
-//     let client = assuan::Client::connect(server_socket.clone());
-//     let inner = AssuanServerCLI {
-//         server_path,
-//         server_socket,
-//         // socket_listener,
-//         // client,
-//         client: Box::pin(client),
-//         // proc,
-//     };
-//     Ok(inner)
-// }
+//     pub fn connect(&self) {
+//         // connect to pinentry-box socket
+//         // connect to bitwarden CLI and retrieve session key
+//         // connect to bitwarden secrets
+//     }
+//
+//     pub async fn start_server_daemon_mode(self) -> Result<()> {
+//         let socket_path = PathBuf::from(&self.config.socket_path);
+//         if socket_path.exists() {
+//             std::fs::remove_file(&socket_path)?;
+//         }
+//         let server = Arc::new(self);
+//         let mut assuan_server = Server::new(socket_path)?;
+//         Ok(())
+//     }
 // }

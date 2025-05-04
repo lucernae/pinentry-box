@@ -3,10 +3,11 @@ import os
 import subprocess
 import tempfile
 import time
+import traceback
 from typing import Optional, Generator
 
 import assuan
-from assuan import Response
+from assuan import Response, AssuanError
 from assuan.common import VarText
 
 from pinentry_box import config
@@ -80,20 +81,18 @@ class ProxyAssuanServer(assuan.AssuanServer):
                 log.info(e)
                 time.sleep(5)
 
+    def _handle_quit(self, arg: str) -> Generator['Response', None, None]:
+        if self.listen_to_quit:
+            self.stop = True
+            yield assuan.Response('OK', 'stopping the server')
+        else:
+            raise assuan.AssuanError(code=175, message='Unknown command (reserved)')
+
     def _handle_bye(self, arg: str) -> Generator['Response', None, None]:
         """BYE command requires us to close fallback server and our own proxy server"""
         for _ in super()._handle_bye(arg):
             pass
-        try:
-            self.fallback_stream_fifo_in.write('BYE\n')
-            self.fallback_stream_fifo_in.flush()
-            self._wait_for_fallback_output()
-            self._read_fallback_output_until_ok()
-            self.fallback_stream_fifo_in.close()
-            self.fallback_stream_fifo_out.close()
-            self.fallback_popen.terminate()
-        except Exception as e:
-            log.info(exc_info=e)
+        self.send_bye_to_fallback_server()
         self.stop = True
         yield assuan.Response('OK', 'closing proxy connection')
 
@@ -151,9 +150,68 @@ class ProxyAssuanServer(assuan.AssuanServer):
 
             setattr(self, f"_handle_{request.command.lower()}", handle_func)
 
+    def __send_response(self, response: 'Response') -> None:
+        """For internal use by ``._handle_requests()``."""
+        # rstring = str(response)
+        log.info('S: %s', response)
+        if self.outtake:
+            self.outtake.write(bytes(response))
+            self.outtake.write(b'\n')
+            try:
+                self.outtake.flush()
+            except IOError:
+                if not self.stop:
+                    raise
+        else:
+            raise Exception('no outtake message provided')
+
+    def __send_error_response(self, error: AssuanError) -> None:
+        """For internal use by ``._handle_requests()``."""
+        self.__send_response(assuan.common.error_response(error))
+
+    def send_bye_to_fallback_server(self):
+        try:
+            self.fallback_stream_fifo_in.write('BYE\n')
+            self.fallback_stream_fifo_in.flush()
+            self._wait_for_fallback_output()
+            self._read_fallback_output_until_ok()
+            self.fallback_stream_fifo_in.close()
+            self.fallback_stream_fifo_out.close()
+            self.fallback_popen.terminate()
+        except Exception as e:
+            log.info('exception', exc_info=e)
+
     def _handle_request(self, request: assuan.Request) -> None:
         # dump what the request is
         log.info(f'Handle Request: {request.command} {assuan.common.to_str(request.parameters)}')
         # lazy register handle function to the fallback assuan server
         self._register_fallback_command(request)
-        super()._handle_request(request)
+
+        try:
+            handle = getattr(self, f"_handle_{request.command.lower()}")
+        except AttributeError:
+            log.warning('unknown command: %s', request.command)
+            self.__send_error_response(AssuanError(message='Unknown command'))
+            return
+
+        try:
+            responses = handle(request.parameters)
+            for response in responses:
+                self.__send_response(response)
+        except AssuanError as err:
+            # on error, handle bye to fallback server
+            self.send_bye_to_fallback_server()
+            # send error to client
+            self.__send_error_response(err)
+        except Exception as e:
+            log.error(
+                'exception while executing %s:\n%s',
+                handle,
+                traceback.format_exc().rstrip(),
+            )
+            self.send_bye_to_fallback_server()
+            # send error to client
+            self.__send_error_response(
+                AssuanError(message='Unspecific Assuan server fault')
+            )
+        return

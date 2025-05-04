@@ -15,7 +15,12 @@ pub struct SecretsAPIConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
-pub struct VaultAPIConfig {}
+pub struct VaultAPIConfig {
+    /// Path to Bitwarden password manager CLI: bw
+    pub program_path: String,
+    /// Port to the Bitwarden Password Manager API port
+    pub port: u16,
+}
 
 #[derive(Serialize, Deserialize, Debug, JsonSchema)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
@@ -26,6 +31,7 @@ pub struct Config {
     pub secrets: SecretsAPIConfig,
     /// key config for Bitwarden Vault Manager
     pub vault: VaultAPIConfig,
+    // pub socket_path: String,
     pub pinentry: PinentryConfig,
 }
 
@@ -36,7 +42,7 @@ pub struct PinentryConfig {
     pub program_path: String,
     /// key config for pinentry extra args
     pub program_args: String,
-    // key config for socket path to access this pinentry server
+    /// key config for socket path to access this pinentry server
     pub socket_path: String,
 }
 
@@ -49,7 +55,10 @@ impl Default for Config {
                 access_token: "".to_string(),
                 project_name: "pinentry-bitwarden".to_string(),
             },
-            vault: VaultAPIConfig {},
+            vault: VaultAPIConfig {
+                program_path: "bw".to_string(),
+                port: 3012,
+            },
             pinentry: PinentryConfig::default(),
         }
     }
@@ -59,7 +68,7 @@ impl Default for PinentryConfig {
     fn default() -> Self {
         PinentryConfig {
             program_path: "pinentry-box".to_string(),
-            program_args: "--start-server".to_string(),
+            program_args: "--start-server --start-daemon".to_string(),
             socket_path: expanduser("~/.pinentry-box.sock")
                 .unwrap()
                 .to_str()

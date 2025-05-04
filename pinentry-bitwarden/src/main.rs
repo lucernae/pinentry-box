@@ -1,13 +1,12 @@
+use crate::config::Config;
+
+use directories::BaseDirs;
+use futures::StreamExt;
+use sequoia_gpg_agent::{Agent, Context};
 use std::env;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::path::PathBuf;
-
-use directories::BaseDirs;
-use futures::StreamExt;
-use sequoia_ipc::gnupg::{Agent, Context};
-
-use crate::config::Config;
 
 pub mod config;
 

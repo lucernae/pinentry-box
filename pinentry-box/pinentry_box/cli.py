@@ -41,33 +41,17 @@ def main(socket_path=None, start_server=False, start_daemon=False):
         filemode='w',
         level=logging.ERROR)
     logging.getLogger('root').setLevel(logging.ERROR)
-    logging.getLogger(__name__).setLevel(app_config.pinentry_box.log_level)
+    logging.getLogger().setLevel(app_config.pinentry_box.log_level)
     logging.info(f'Logging level: {app_config.pinentry_box.log_level}')
     logging.info(f'config: {app_config.json()}')
     pinentry_fallback = os.getenv('PINENTRY_BOX__FALLBACK', app_config.pinentry_box.fallback)
     logging.info(f'Using pinentry fallback: {pinentry_fallback}')
 
-    pycharm_debug_mode = os.getenv('PINENTRY_BOX__PYCHARM_DEBUG__ENABLE', app_config.pinentry_box.pycharm_debug.enable)
-    if pycharm_debug_mode == '1' or pycharm_debug_mode == True:
-        pycharm_debug_mode = True
-    else:
-        pycharm_debug_mode = False
-    logging.info(f'Using debug mode: {pycharm_debug_mode}')
-    if pycharm_debug_mode:
-        try:
-            import pydevd_pycharm
-            pydevd_pycharm.settrace(
-                app_config.pinentry_box.pycharm_debug.host,
-                port=app_config.pinentry_box.pycharm_debug.port,
-                stdoutToServer=True,
-                stderrToServer=True)
-        except Exception:
-            # bypass if there are no debug server
-            pass
     # to test something via debugger flow, use this to avoid IO blocking:
     # server.intake = io.BytesIO(b'BYE\n')
-    app_config, config_file_found = config.load_config()
     if not start_server:
+
+        run_debug_server(app_config)
 
         server = ProxyAssuanServer(
             name='pinentry-box',
@@ -77,11 +61,11 @@ def main(socket_path=None, start_server=False, start_daemon=False):
     else:
         socket_path = socket_path or str(app_config.pinentry_box.socket_server_path)
         pid_file = os.path.join(os.path.dirname(socket_path), '.pinentry-box.pid')
-        if os.path.exists(socket_path) or os.path.exists(pid_file):
-            print(f'Socket path {socket_path} or pid file {pid_file} already exists, exiting...')
-            sys.exit(1)
 
         if start_daemon:
+            if os.path.exists(socket_path) or os.path.exists(pid_file):
+                print(f'Socket path {socket_path} or pid file {pid_file} already exists, exiting...')
+                sys.exit(1)
             # First fork
             pid = os.fork()
             if pid > 0:
@@ -124,6 +108,7 @@ def main(socket_path=None, start_server=False, start_daemon=False):
             signal.signal(signal.SIGTERM, lambda signum, frame: signal_handler(signum, frame, socket_path, pid_file))
             signal.signal(signal.SIGINT, lambda signum, frame: signal_handler(signum, frame, socket_path, pid_file))
 
+        run_debug_server(app_config)
         try:
             os.remove(socket_path)
         except FileNotFoundError:
@@ -135,6 +120,7 @@ def main(socket_path=None, start_server=False, start_daemon=False):
             name='pinentry-box',
             socket=unix_socket,
             server=ProxyAssuanServer,
+            listen_to_quit=True,
             app_config=app_config,
             fallback_server_program=pinentry_fallback,
         )
@@ -143,8 +129,32 @@ def main(socket_path=None, start_server=False, start_daemon=False):
         try:
             server.run()
         finally:
+            try:
+                os.remove(socket_path)
+            except FileNotFoundError:
+                pass
             if start_daemon:
                 cleanup_daemon(socket_path, pid_file)
+
+
+def run_debug_server(app_config):
+    pycharm_debug_mode = os.getenv('PINENTRY_BOX__PYCHARM_DEBUG__ENABLE', app_config.pinentry_box.pycharm_debug.enable)
+    if pycharm_debug_mode == '1' or pycharm_debug_mode == True:
+        pycharm_debug_mode = True
+    else:
+        pycharm_debug_mode = False
+    logging.info(f'Using debug mode: {pycharm_debug_mode}')
+    if pycharm_debug_mode:
+        try:
+            import pydevd_pycharm
+            pydevd_pycharm.settrace(
+                app_config.pinentry_box.pycharm_debug.host,
+                port=app_config.pinentry_box.pycharm_debug.port,
+                stdoutToServer=True,
+                stderrToServer=True)
+        except Exception:
+            # bypass if there are no debug server
+            pass
 
 
 if __name__ == '__main__':

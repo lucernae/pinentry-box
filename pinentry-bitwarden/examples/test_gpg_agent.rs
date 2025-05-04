@@ -1,39 +1,33 @@
-/// Connects to and sends commands to gpg-agent.
-
-use std::path::PathBuf;
-
 use clap::CommandFactory;
 use clap::FromArgMatches;
 use clap::Parser;
-
 use futures::StreamExt;
-
-use sequoia_ipc as ipc;
-use crate::ipc::gnupg::{Context, Agent};
-
-use sequoia_openpgp as openpgp;
 use openpgp::Result;
+use sequoia_gpg_agent::gnupg::Context;
+use sequoia_gpg_agent::Agent;
+use sequoia_openpgp as openpgp;
+use std::path::PathBuf;
 
 /// Defines the CLI.
 #[derive(Parser, Debug)]
 #[clap(
-name = "gpg-agent-client",
-about = "Connects to and sends commands to gpg-agent.",
+    name = "gpg-agent-client",
+    about = "Connects to and sends commands to gpg-agent."
 )]
 pub struct Cli {
     #[clap(
-    long,
-    value_name = "PATH",
-    env = "GNUPGHOME",
-    help = "Use this GnuPG home directory, default: $GNUPGHOME",
+        long,
+        value_name = "PATH",
+        env = "GNUPGHOME",
+        help = "Use this GnuPG home directory, default: $GNUPGHOME"
     )]
     homedir: Option<PathBuf>,
 
     #[clap(
-    long,
-    value_name = "commands",
-    help = "Commands to send to the server",
-    required = true,
+        long,
+        value_name = "commands",
+        help = "Commands to send to the server",
+        required = true
     )]
     commands: Vec<String>,
 }
@@ -43,7 +37,8 @@ fn main() -> Result<()> {
         "{} (sequoia-openpgp {}, using {})",
         env!("CARGO_PKG_VERSION"),
         sequoia_openpgp::VERSION,
-        sequoia_openpgp::crypto::backend());
+        sequoia_openpgp::crypto::backend()
+    );
     let cli = Cli::command().version(version);
     let matches = Cli::from_arg_matches(&cli.get_matches())?;
 

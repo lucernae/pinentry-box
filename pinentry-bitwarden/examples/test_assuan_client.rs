@@ -8,14 +8,17 @@ use clap::CommandFactory;
 use clap::FromArgMatches;
 use clap::Parser;
 
-use crate::ipc::assuan::Client;
+// use crate::ipc::assuan::Client;
 use futures::{StreamExt, TryFuture};
+use gpg_agent::assuan::Client;
+use sequoia_gpg_agent as gpg_agent;
 use sequoia_ipc as ipc;
 
 use openpgp::Result;
 use pinentry_bitwarden::assuan_server::{PinentryBox, SocketServerState};
 use pinentry_bitwarden::config::PinentryConfig;
-use sequoia_ipc::assuan::Response;
+// use sequoia_ipc::assuan::Response;
+use gpg_agent::assuan::Response;
 use sequoia_openpgp as openpgp;
 use tokio::io::AsyncReadExt;
 use tokio::net::UnixStream;
@@ -37,6 +40,38 @@ pub struct Cli {
         required = true
     )]
     commands: Vec<String>,
+}
+
+#[tokio::test]
+async fn test_getpin() -> Result<()> {
+    let mut pinentry_box_config = PinentryConfig::default();
+    let pinentry_box = PinentryBox::new(pinentry_box_config);
+    let mut client = pinentry_box.connect().await.unwrap();
+    client.send("GETPIN").unwrap();
+    while let Some(response) = client.next().await {
+        println!("< {:?}", response);
+    }
+    client.send("BYE").unwrap();
+    while let Some(response) = client.next().await {
+        println!("< {:?}", response);
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_confirm() -> Result<()> {
+    let mut pinentry_box_config = PinentryConfig::default();
+    let pinentry_box = PinentryBox::new(pinentry_box_config);
+    let mut client = pinentry_box.connect().await.unwrap();
+    client.send("CONFIRM").unwrap();
+    while let Some(response) = client.next().await {
+        println!("< {:?}", response);
+    }
+    client.send("BYE").unwrap();
+    while let Some(response) = client.next().await {
+        println!("< {:?}", response);
+    }
+    Ok(())
 }
 
 fn main() -> Result<()> {
